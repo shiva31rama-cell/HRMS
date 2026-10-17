@@ -27,7 +27,7 @@ Requirements: Flutter stable, Node.js 20 or newer, and a MongoDB database. A fre
 1. Copy backend/.env.example to backend/.env and edit the values. Use a unique JWT_SECRET and a strong BOOTSTRAP_ADMIN_PASSWORD. Never commit backend/.env.
 2. Create an Atlas database and place its connection URI in MONGODB_URI. In Atlas, create a database user and allow connections from the backend host. Avoid exposing a database password in Flutter code.
 3. In a terminal, run npm install inside the backend folder, then run npm run dev.
-4. In a second terminal, run flutter pub get inside the app folder, then start the app with: flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:5000/api
+4. In a second terminal, run flutter pub get inside the app folder, then start the app with: flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhost:5000/api
 5. Sign in with the administrator email and password configured in backend/.env. When SEED_DEMO_DATA=true, a few sample rooms and a welcome notice are created if the database is empty.
 
 The API base URL is configured at Flutter build time. It is not a secret; the database URI and JWT signing key are secrets and must stay on the backend.

@@ -354,7 +354,9 @@ class _SectionViewState extends State<_SectionView> {
             IconButton(tooltip: 'Refresh', onPressed: _load, icon: const Icon(Icons.refresh)),
           ]),
           const SizedBox(height: 20),
-          if (_error != null)
+          if (_loading)
+            const Padding(padding: EdgeInsets.all(42), child: Center(child: CircularProgressIndicator()))
+          else if (_error != null)
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(color: const Color(0xFFFFEEEE), borderRadius: BorderRadius.circular(12)),
@@ -362,9 +364,7 @@ class _SectionViewState extends State<_SectionView> {
                 Expanded(child: Text(_error!, style: const TextStyle(color: Color(0xFF9A3030)))),
                 TextButton(onPressed: _load, child: const Text('Retry')),
               ]),
-            ),
-          if (_loading)
-            const Padding(padding: EdgeInsets.all(42), child: Center(child: CircularProgressIndicator()))
+            )
           else
             _content(),
         ],
