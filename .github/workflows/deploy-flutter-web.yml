@@ -33,6 +33,19 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Validate deployment API URL
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          if [ -z "$API_BASE_URL" ]; then
+            echo "::error::Create the repository Actions variable API_BASE_URL with your deployed Render API URL ending in /api, then re-run this workflow."
+            exit 1
+          fi
+          case "$API_BASE_URL" in
+            https://*) ;;
+            *) echo "::error::API_BASE_URL must use HTTPS for a hosted deployment."; exit 1 ;;
+          esac
+
       - name: Install Flutter packages
         working-directory: app
         run: flutter pub get
