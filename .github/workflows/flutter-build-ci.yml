@@ -1,0 +1,36 @@
+name: Validate Flutter Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - ".github/workflows/flutter-build-ci.yml"
+  pull_request:
+    paths:
+      - "app/**"
+      - ".github/workflows/flutter-build-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  flutter-web-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Flutter packages
+        working-directory: app
+        run: flutter pub get
+
+      - name: Compile Flutter Web
+        working-directory: app
+        run: flutter build web --release --base-href /HRMS/ --dart-define=API_BASE_URL=https://example.invalid/api
