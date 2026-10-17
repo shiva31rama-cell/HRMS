@@ -1,0 +1,9 @@
+{
+  "name": "HostelHub - Hostel Room Management",
+  "short_name": "HostelHub",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#F5F7F6",
+  "theme_color": "#176B58",
+  "description": "Hostel Room Management System"
+}
