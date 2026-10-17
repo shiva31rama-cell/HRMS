@@ -778,7 +778,7 @@ class _Stat extends StatelessWidget {
       const SizedBox(height: 12),
       Text(value, style: const TextStyle(fontSize: 29, fontWeight: FontWeight.w800)),
     ]),
-  )));
+  ))));
 
 class _Pill extends StatelessWidget {
   const _Pill({required this.text, required this.color});
