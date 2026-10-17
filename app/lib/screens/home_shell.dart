@@ -239,6 +239,9 @@ class _SectionViewState extends State<_SectionView> {
     if (widget.section == 'rooms') {
       result = await showDialog<Map<String, dynamic>>(context: context, builder: (_) => const _RoomForm());
       path = '/rooms';
+    } else if (widget.section == 'students') {
+      result = await showDialog<Map<String, dynamic>>(context: context, builder: (_) => const _StudentForm());
+      path = '/students';
     } else if (widget.section == 'maintenance') {
       result = await showDialog<Map<String, dynamic>>(context: context, builder: (_) => const _RequestForm());
       path = '/maintenance';
@@ -252,7 +255,14 @@ class _SectionViewState extends State<_SectionView> {
     try {
       await widget.api.post(path, Map<String, dynamic>.from(result as Map));
       await _load();
-      if (mounted) _toast(context, 'Saved successfully.');
+      if (mounted) {
+        _toast(
+          context,
+          widget.section == 'students'
+              ? 'Student account created. Share the temporary password securely.'
+              : 'Saved successfully.',
+        );
+      }
     } catch (error) {
       if (mounted) _toast(context, _err(error), bad: true);
     }
@@ -311,6 +321,7 @@ class _SectionViewState extends State<_SectionView> {
   @override
   Widget build(BuildContext context) {
     final canAdd = (widget.section == 'rooms' && widget.isStaff) ||
+        (widget.section == 'students' && widget.isStaff) ||
         (widget.section == 'maintenance' && !widget.isStaff) ||
         (widget.section == 'notices' && widget.isStaff);
     return RefreshIndicator(
@@ -329,7 +340,15 @@ class _SectionViewState extends State<_SectionView> {
               FilledButton.icon(
                 onPressed: _create,
                 icon: const Icon(Icons.add),
-                label: Text(widget.section == 'rooms' ? 'Add room' : widget.section == 'notices' ? 'Publish' : 'New request'),
+                label: Text(
+                  widget.section == 'rooms'
+                      ? 'Add room'
+                      : widget.section == 'students'
+                          ? 'Add student'
+                          : widget.section == 'notices'
+                              ? 'Publish'
+                              : 'New request',
+                ),
               ),
             ],
             IconButton(tooltip: 'Refresh', onPressed: _load, icon: const Icon(Icons.refresh)),
@@ -707,6 +726,82 @@ class _RequestFormState extends State<_RequestForm> {
           'category': _category, 'priority': _priority,
         });
       }, child: const Text('Submit')),
+    ],
+  );
+}
+
+class _StudentForm extends StatefulWidget {
+  const _StudentForm();
+
+  @override
+  State<_StudentForm> createState() => _StudentFormState();
+}
+
+class _StudentFormState extends State<_StudentForm> {
+  final _form = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  final _email = TextEditingController();
+  final _phone = TextEditingController();
+  final _password = TextEditingController();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    _phone.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Create student account'),
+    content: SizedBox(width: 410, child: Form(
+      key: _form,
+      child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextFormField(
+          controller: _name,
+          decoration: const InputDecoration(labelText: 'Full name'),
+          textCapitalization: TextCapitalization.words,
+          validator: _required,
+        ),
+        const SizedBox(height: 10),
+        TextFormField(
+          controller: _email,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(labelText: 'Email address'),
+          validator: (value) => value != null && value.contains('@') && value.contains('.')
+              ? null
+              : 'Enter a valid email address.',
+        ),
+        const SizedBox(height: 10),
+        TextFormField(
+          controller: _phone,
+          keyboardType: TextInputType.phone,
+          decoration: const InputDecoration(labelText: 'Phone (optional)'),
+        ),
+        const SizedBox(height: 10),
+        TextFormField(
+          controller: _password,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: 'Temporary password (8+ characters)'),
+          validator: (value) => value != null && value.length >= 8
+              ? null
+              : 'Use at least 8 characters.',
+        ),
+      ])),
+    )),
+    actions: [
+      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+      FilledButton(onPressed: () {
+        if (!_form.currentState!.validate()) return;
+        Navigator.pop(context, <String, dynamic>{
+          'name': _name.text.trim(),
+          'email': _email.text.trim(),
+          'phone': _phone.text.trim(),
+          'password': _password.text,
+        });
+      }, child: const Text('Create account')),
     ],
   );
 }
