@@ -77,3 +77,8 @@ Run npm test inside backend/ to execute the API's input-validation unit tests.
 ## Important prototype notes
 
 Before using real student information, add institution-approved privacy, retention, backup, and account-recovery procedures. Configure allowed origins for your deployed frontend rather than relying on wildcard CORS. Never upload a real .env file, student database export, or production credentials to GitHub.
+
+## Project documentation
+
+- [Project Documentation](docs/PROJECT_DOCUMENTATION.md) — abstract, problem statement, SDG relevance, roles, architecture, database design, API outline, security, test plan, and evaluation demo script.
+- [User and Deployment Guide](docs/USER_GUIDE.md) — database setup, Render deployment, GitHub Pages configuration, local run steps, and troubleshooting.
