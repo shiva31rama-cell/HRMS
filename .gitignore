@@ -26,3 +26,6 @@ app/android/local.properties
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# Generated local ML evaluation report
+ml-service/reports/evaluation_results.json

@@ -5,6 +5,11 @@ from app import app, TRAINING_ROWS
 client = TestClient(app)
 
 class MLServiceTests(unittest.TestCase):
+    def test_dataset_has_expected_labels(self):
+        self.assertGreaterEqual(len(TRAINING_ROWS), 50)
+        self.assertEqual({row[1] for row in TRAINING_ROWS}, {"Plumbing", "Electrical", "Cleanliness", "Furniture", "Other"})
+        self.assertEqual({row[2] for row in TRAINING_ROWS}, {"low", "normal", "high", "urgent"})
+
     def test_health(self):
         response = client.get("/health")
         self.assertEqual(response.status_code, 200)

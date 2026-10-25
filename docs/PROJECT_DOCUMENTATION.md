@@ -249,3 +249,11 @@ The repository currently includes a small hand-labelled starter dataset so the p
 - Priority model: per-class precision/recall/F1, especially recall for urgent tickets.
 - Compare the trained model against a simple majority-class baseline.
 - Discuss class imbalance, small-sample bias, ambiguous text, and the need for human review.
+
+## 16. Reproducible DWDM evaluation
+
+The ML service loads data from `ml-service/data/maintenance_tickets.csv`, containing `text`, `category`, and `priority` columns. It is synthetic educational data and must not be represented as a real-world hostel dataset.
+
+The script `ml-service/scripts/train_evaluate.py` performs a deterministic stratified 80/20 train/test split, fits TF-IDF + Multinomial Naive Bayes pipelines for category and priority, and writes held-out accuracy, majority-class baseline accuracy, per-class precision/recall/F1, and confusion matrices to `ml-service/reports/evaluation_results.json`.
+
+Run it from `ml-service/` with `python scripts/train_evaluate.py`. Include the generated results in the academic report, explain the synthetic-data limitation, and repeat evaluation on a permitted, reviewed, de-identified dataset if one becomes available.

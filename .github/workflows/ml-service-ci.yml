@@ -30,3 +30,6 @@ jobs:
       - name: Run ML service tests
         working-directory: ml-service
         run: python -m unittest discover -s . -p "test_app.py"
+      - name: Run held-out ML evaluation
+        working-directory: ml-service
+        run: python scripts/train_evaluate.py

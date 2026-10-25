@@ -1,5 +1,7 @@
 from collections import Counter
 from datetime import datetime, timezone
+import csv
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -14,47 +16,28 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Small hand-labelled examples make the academic demo reproducible. Extend with
-# reviewed, de-identified real tickets before making real-world accuracy claims.
-TRAINING_ROWS = [
-    ("tap leaking water dripping pipe wet bathroom", "Plumbing", "normal"),
-    ("toilet flush broken water pipe leaking", "Plumbing", "high"),
-    ("washbasin drain blocked water overflowing", "Plumbing", "high"),
-    ("no water coming from shower tap", "Plumbing", "normal"),
-    ("severe pipe burst flooding room immediately", "Plumbing", "urgent"),
-    ("water heater leaking near bathroom", "Plumbing", "high"),
-    ("electrical socket sparking burning smell", "Electrical", "urgent"),
-    ("fan not working switch broken", "Electrical", "normal"),
-    ("lights flickering in room", "Electrical", "low"),
-    ("power outage exposed wire danger", "Electrical", "urgent"),
-    ("ceiling light stopped working", "Electrical", "normal"),
-    ("air conditioner electrical power issue", "Electrical", "high"),
-    ("dirty bathroom needs cleaning", "Cleanliness", "normal"),
-    ("garbage not collected bad smell corridor", "Cleanliness", "normal"),
-    ("pest insects cockroach problem in room", "Cleanliness", "high"),
-    ("spilled waste dirty common area", "Cleanliness", "low"),
-    ("mold and damp smell in bathroom", "Cleanliness", "high"),
-    ("room needs deep cleaning urgently before inspection", "Cleanliness", "high"),
-    ("broken bed frame loose screws", "Furniture", "normal"),
-    ("cupboard door hinge broken", "Furniture", "low"),
-    ("study table chair damaged unusable", "Furniture", "normal"),
-    ("window lock broken cannot secure room", "Furniture", "high"),
-    ("mattress damaged bed board cracked", "Furniture", "normal"),
-    ("door handle came off and door won't close", "Furniture", "high"),
-    ("internet wifi connection slow", "Other", "low"),
-    ("lost key need help from warden", "Other", "normal"),
-    ("urgent safety issue in corridor", "Other", "urgent"),
-    ("noise complaint from neighbouring room", "Other", "low"),
-    ("water cooler not cooling", "Other", "normal"),
-    ("lift stopped between floors people trapped", "Other", "urgent"),
-    ("minor dripping tap can wait until tomorrow", "Plumbing", "low"),
-    ("socket completely dead no power to desk", "Electrical", "normal"),
-    ("overflowing toilet flooding shared bathroom", "Plumbing", "urgent"),
-    ("broken chair leg could cause injury", "Furniture", "high"),
-    ("trash room overflowing and attracting pests", "Cleanliness", "high"),
-    ("small light bulb fused", "Electrical", "low"),
-]
+# The bundled dataset is synthetic and intended for reproducible academic demonstration.
+# Replace it with reviewed, de-identified records before making real-world accuracy claims.
+DATASET_PATH = Path(__file__).resolve().parent / "data" / "maintenance_tickets.csv"
 
+def load_training_rows() -> list[tuple[str, str, str]]:
+    if not DATASET_PATH.exists():
+        raise RuntimeError(f"Required training dataset not found: {DATASET_PATH}")
+    with DATASET_PATH.open("r", encoding="utf-8", newline="") as dataset_file:
+        reader = csv.DictReader(dataset_file)
+        required_columns = {"text", "category", "priority"}
+        if not reader.fieldnames or not required_columns.issubset(reader.fieldnames):
+            raise RuntimeError("Dataset must contain text, category, and priority columns.")
+        rows = [
+            (row["text"].strip(), row["category"].strip(), row["priority"].strip())
+            for row in reader
+            if row.get("text", "").strip()
+        ]
+    if len(rows) < 10:
+        raise RuntimeError("Dataset needs at least 10 non-empty rows to train the demo model.")
+    return rows
+
+TRAINING_ROWS = load_training_rows()
 texts = [row[0] for row in TRAINING_ROWS]
 category_labels = [row[1] for row in TRAINING_ROWS]
 priority_labels = [row[2] for row in TRAINING_ROWS]
@@ -102,7 +85,8 @@ def predict_maintenance(payload: PredictionInput) -> dict[str, Any]:
         "priorityConfidence": priority_confidence,
         "model": "TF-IDF + Multinomial Naive Bayes",
         "trainingExamples": len(TRAINING_ROWS),
-        "disclaimer": "Demo model trained on a small hand-labelled starter dataset. Staff must review suggestions; confidence is not a guarantee of correctness.",
+        "datasetType": "synthetic academic demonstration data",
+        "disclaimer": "Model trained on synthetic demonstration data. Staff must review suggestions; confidence is not a guarantee of correctness.",
     }
 
 def parse_date(value: Any) -> datetime | None:

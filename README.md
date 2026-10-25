@@ -1,114 +1,282 @@
 # Hostel Room Management System (HRMS)
 
-A full-stack educational project built with Flutter, Node.js, Express, and MongoDB. It is designed to support a hostel warden's daily work while giving students a simple way to view room availability, raise maintenance requests, and read notices.
+> **One project for two subjects:** Flutter application development and Data Warehousing & Data Mining (DWDM).
+
+HostelHub is a full-stack educational hostel management system. Students can view room information, submit maintenance requests, and read notices. Staff can manage rooms and students, review maintenance, and use machine-learning predictions with maintenance analytics.
+
+## Table of contents
+
+1. [Project goals](#project-goals)
+2. [Features](#features)
+3. [Technology stack](#technology-stack)
+4. [Repository structure](#repository-structure)
+5. [System architecture](#system-architecture)
+6. [Run locally](#run-locally)
+7. [Test and evaluate the ML module](#test-and-evaluate-the-ml-module)
+8. [Deployment](#deployment)
+9. [API endpoints](#api-endpoints)
+10. [Testing](#testing)
+11. [DWDM limitations](#dwdm-limitations)
+12. [Documentation](#documentation)
+13. [Security notes](#security-notes)
+
+## Project goals
+
+### Flutter subject
+- Build a responsive Flutter application for desktop, tablet, and mobile-sized screens.
+- Implement authentication, role-aware navigation, room management, maintenance requests, and notices.
+- Connect Flutter to a REST API.
+
+### DWDM subject
+- Use TF-IDF and Multinomial Naive Bayes to classify maintenance text.
+- Predict a suggested maintenance category and priority.
+- Mine records to summarise category, priority, status, monthly request volume, and resolution time.
+- Evaluate with a held-out test set, per-class precision/recall/F1, confusion matrices, and a majority-class baseline.
 
 ## Features
 
-- Secure login with role-based access for administrators, wardens, and students.
-- Room and bed management with capacity checks and occupancy tracking.
-- Student registration and room allocation by staff.
-- Maintenance requests with open, in-progress, and resolved states.
+- Authentication with administrator, warden, and student roles.
+- Room/bed capacity tracking and room allocation.
+- Maintenance requests and status updates.
 - Hostel announcements.
-- Dashboard totals, REST API health endpoint, validation, and basic request throttling.
-- **DWDM / ML module:** TF-IDF + Multinomial Naive Bayes suggests maintenance category and priority; data mining summarises stored ticket categories, status, monthly volume, and resolution time.
-- Responsive Flutter UI suitable for desktop, tablet, and mobile-sized browsers.
-- Automated Flutter Web deployment to GitHub Pages and an example Render service blueprint.
+- Staff-only **ML Insights** screen.
+- Maintenance category/priority prediction.
+- Analytics derived from saved MongoDB records.
+- Backend input validation, request throttling, and health endpoint.
+- GitHub Actions checks for backend, Flutter Web, and ML service.
 
-## Project layout
+## Technology stack
 
-- app/ — Flutter application and web entry point.
-- backend/ — Express REST API, MongoDB models, auth middleware, and tests.
-- ml-service/ — Python FastAPI service, scikit-learn models, maintenance analytics, and ML tests.
-- .github/workflows/deploy-flutter-web.yml — GitHub Pages deployment workflow.
-- render.yaml — Render backend blueprint.
+| Layer | Technology | Responsibility |
+|---|---|---|
+| Frontend | Flutter, Dart | User interface |
+| REST API | Node.js, Express | Authentication, permissions, business rules |
+| Database | MongoDB / MongoDB Atlas | Users, rooms, maintenance, notices |
+| ML API | Python, FastAPI | Predictions and analytics |
+| Algorithms | scikit-learn, TF-IDF, Multinomial Naive Bayes | Text classification |
+| Backend hosting | Render | Node API and Python ML service |
+| Frontend hosting | GitHub Pages | Flutter Web |
+| CI | GitHub Actions | Automated checks |
 
+## Repository structure
 
-## DWDM / Machine Learning module
+```text
+HRMS/
+├── .github/workflows/
+│   ├── backend-ci.yml                 # Node API tests and syntax checks
+│   ├── flutter-build-ci.yml           # Compile Flutter Web
+│   ├── deploy-flutter-web.yml         # Deploy Flutter Web to Pages
+│   └── ml-service-ci.yml              # Python ML tests
+├── app/                               # FLUTTER SUBJECT
+│   ├── lib/
+│   │   ├── main.dart                  # App entry point
+│   │   ├── screens/
+│   │   │   ├── login_screen.dart      # Sign-in / registration
+│   │   │   └── home_shell.dart        # Dashboard and ML Insights
+│   │   └── services/
+│   │       └── api_service.dart       # Authenticated REST client
+│   ├── web/                           # Flutter Web shell
+│   └── pubspec.yaml                   # Flutter dependencies
+├── backend/                           # NODE.JS REST API
+│   ├── lib/validation.js              # Shared validation
+│   ├── tests/validation.test.js       # Backend tests
+│   ├── .env.example                   # Safe configuration template
+│   ├── package.json                   # Node dependencies
+│   └── server.js                      # Routes, auth, MongoDB, ML proxy
+├── ml-service/                        # DWDM / MACHINE LEARNING
+│   ├── data/maintenance_tickets.csv   # Synthetic labelled dataset
+│   ├── reports/README.md              # Evaluation report instructions
+│   ├── scripts/train_evaluate.py      # Held-out evaluation and metrics
+│   ├── app.py                         # FastAPI and trained classifiers
+│   ├── requirements.txt               # Python dependencies
+│   ├── test_app.py                    # ML service tests
+│   └── README.md                      # ML setup and usage
+├── docs/
+│   ├── PROJECT_DOCUMENTATION.md       # Project design and report
+│   ├── USER_GUIDE.md                  # Application/deployment guide
+│   └── DWDM_IMPLEMENTATION_GUIDE.md   # DWDM methodology and evaluation
+├── .gitignore
+├── README.md                          # This file
+└── render.yaml                        # Node + Python hosting blueprint
+```
 
-This same hostel application is shared by both subjects. Flutter is the application-development component; the DWDM component is the **Maintenance Intelligence** module.
+## System architecture
 
-- Text classification: TF-IDF features + Multinomial Naive Bayes predict a maintenance category and a suggested priority from the title/description.
-- Data mining: aggregate saved maintenance records into category, priority, status, monthly volume, and average resolution-time summaries.
-- Architecture: Flutter → authenticated Node/Express API → Python FastAPI/scikit-learn service; Node reads the existing MongoDB maintenance records and passes only analytics fields to the ML service.
-- Access: ML Insights and prediction endpoints are staff-only.
-- Important limitation: the starter classifier is trained on a small hand-labelled demonstration dataset. Its score is not proof of real-world accuracy and staff must review predictions. For the final DWDM evaluation, add a sufficiently sized, reviewed, de-identified dataset and report a held-out test score/confusion matrix.
+```text
+Flutter Web
+    | HTTPS + bearer token
+    v
+Node.js / Express API -----------------> Python FastAPI ML service
+    |                                    | TF-IDF text features
+    v                                    | Multinomial Naive Bayes
+MongoDB / Atlas                          | Maintenance analytics
+                                         v
+                                  Prediction + metrics
+```
 
-### Run the ML service locally
-
-From the repository root, in a separate terminal:
-
-    cd ml-service
-    python -m venv .venv
-    # Windows PowerShell: .venv\\Scripts\\Activate.ps1
-    # macOS/Linux: source .venv/bin/activate
-    pip install -r requirements.txt
-    uvicorn app:app --reload --port 8000
-
-Set `ML_SERVICE_URL=http://localhost:8000` in `backend/.env`, then restart the Node API. Open `http://localhost:8000/docs` to inspect the service endpoints. Python tests can be run with `python -m unittest discover -s . -p test_app.py` inside `ml-service`.
-
-### Deploy ML service
-
-The Render Blueprint now includes a separate `hrms-ml` Python service. Apply/redeploy `render.yaml`, wait for its `/health` endpoint to pass, and ensure the `hrms-api` service has `ML_SERVICE_URL=http://hrms-ml:10000`. If the services are in different Render regions, use the ML service's HTTPS public URL instead. The API will return a clear 503 if the ML service has not been configured or is unavailable.
+Node.js owns authentication and database access. The Python service does not connect directly to MongoDB; the authenticated Node API sends only selected maintenance fields for analytics. ML endpoints are staff-only.
 
 ## Run locally
 
-Requirements: Flutter stable, Node.js 20 or newer, and a MongoDB database. A free MongoDB Atlas cluster can be used instead of installing MongoDB locally.
+### Prerequisites
+- Flutter stable SDK
+- Node.js 20 or newer
+- Python 3.11 recommended
+- MongoDB locally or MongoDB Atlas
 
-1. Copy backend/.env.example to backend/.env and edit the values. Use a unique JWT_SECRET and a strong BOOTSTRAP_ADMIN_PASSWORD. Never commit backend/.env.
-2. Create an Atlas database and place its connection URI in MONGODB_URI. In Atlas, create a database user and allow connections from the backend host. Avoid exposing a database password in Flutter code.
-3. In a terminal, run npm install inside the backend folder, then run npm run dev.
-4. In a second terminal, run flutter pub get inside the app folder, then start the app with: flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhost:5000/api
-5. Sign in with the administrator email and password configured in backend/.env. When SEED_DEMO_DATA=true, a few sample rooms and a welcome notice are created if the database is empty.
+### 1. Configure and start Node API
 
-The API base URL is configured at Flutter build time. It is not a secret; the database URI and JWT signing key are secrets and must stay on the backend.
+From the repository root, in PowerShell:
 
-## Deploy the backend for free
+```powershell
+Copy-Item backend/.env.example backend/.env
+```
 
-1. Create a free MongoDB Atlas cluster and copy its connection string. Replace the username, password, and database name with your own values, and ensure the URI is URL-encoded where necessary.
-2. Open Render and choose New Blueprint, then connect this repository and apply render.yaml. If Render asks for MONGODB_URI, BOOTSTRAP_ADMIN_EMAIL, or BOOTSTRAP_ADMIN_PASSWORD, provide your own values. Keep the administrator password private. The blueprint generates a JWT_SECRET.
-3. Once deployed, open the service URL and check /api/health. The response should show status ok and database connected.
-4. Copy the Render service's HTTPS URL; the Flutter API URL is that URL followed by /api.
+Edit `backend/.env` and set your own `MONGODB_URI`, `JWT_SECRET`, `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD`, and `ML_SERVICE_URL=http://localhost:8000`. Never commit `backend/.env`.
 
-Free Render services can sleep after inactivity, so the first API request after a quiet period may be slow. This project is suitable for a class prototype and demonstration, not a service with a production uptime guarantee.
+Start Terminal 1:
 
-## Deploy Flutter Web with GitHub Pages
+```powershell
+cd backend
+npm install
+npm run dev
+```
 
-1. In GitHub, open Settings → Pages and set the build and deployment source to GitHub Actions.
-2. Open Settings → Secrets and variables → Actions → Variables. Add a repository variable named API_BASE_URL with the deployed Render API URL, including /api (for example, https://your-service.onrender.com/api).
-3. Ensure the workflow file is on main, then run or re-run the Flutter Web deployment workflow from the Actions tab. New commits to app/ or the workflow file trigger it automatically.
-4. After the workflow succeeds, the app will be available at https://shiva31rama-cell.github.io/HRMS/.
+API health: `http://localhost:5000/api/health`.
 
-If the API URL is changed later, update the repository variable and run the deployment workflow again. GitHub Pages hosts the Flutter web client only; it does not host the Node server or database.
+### 2. Start Python ML service
 
-## API overview
+Start Terminal 2 from the repository root:
 
-- POST /api/auth/register — create a student account.
-- POST /api/auth/login — sign in and receive a bearer token.
-- GET /api/auth/me — current account.
-- GET /api/rooms — list rooms; staff can also create, edit, and delete empty rooms.
-- GET /api/students — staff-only student list.
-- POST /api/students — staff creates a student account.
-- PATCH /api/students/:id/room — staff allocates or unallocates a room.
-- GET /api/maintenance — list own requests for students, or all requests for staff.
-- POST /api/maintenance — create a maintenance request.
-- PATCH /api/maintenance/:id — staff updates the request status.
-- GET /api/announcements — read hostel notices.
-- POST /api/announcements — staff publishes a notice.
-- PATCH /api/announcements/:id and DELETE /api/announcements/:id — staff manages notices.
-- GET /api/dashboard — staff dashboard totals.
-- GET /api/health — service and database health.
+```powershell
+cd ml-service
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+uvicorn app:app --reload --port 8000
+```
 
-All endpoints except register, login, and health require a valid bearer token. Staff-only operations check the user's role on the server, not merely in the Flutter interface.
+- Health: `http://localhost:8000/health`
+- Interactive docs: `http://localhost:8000/docs`
 
-## Tests
+### 3. Start Flutter
 
-Run npm test inside backend/ to execute the API's input-validation unit tests.
+Start Terminal 3 from the repository root:
 
-## Important prototype notes
+```powershell
+cd app
+flutter pub get
+flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhost:5000/api
+```
 
-Before using real student information, add institution-approved privacy, retention, backup, and account-recovery procedures. Configure allowed origins for your deployed frontend rather than relying on wildcard CORS. Never upload a real .env file, student database export, or production credentials to GitHub.
+Sign in with the administrator credentials configured in `backend/.env`. Use a staff account to see **ML Insights**.
 
-## Project documentation
+## Test and evaluate the ML module
 
-- [Project Documentation](docs/PROJECT_DOCUMENTATION.md) — abstract, problem statement, SDG relevance, roles, architecture, database design, API outline, security, test plan, and evaluation demo script.
-- [User and Deployment Guide](docs/USER_GUIDE.md) — database setup, Render deployment, GitHub Pages configuration, local run steps, and troubleshooting.
+From PowerShell:
+
+```powershell
+cd ml-service
+.venv\Scripts\Activate.ps1
+python -m unittest discover -s . -p test_app.py
+python scripts/train_evaluate.py
+```
+
+The evaluation script creates `ml-service/reports/evaluation_results.json` with train/test sizes, class distribution, held-out accuracy, majority-class baseline, per-class precision/recall/F1, and confusion matrices. The report is generated locally and is not committed automatically.
+
+## Deployment
+
+### Render: Node API and Python service
+1. Create a MongoDB Atlas database and database user.
+2. Create/update a Render Blueprint from `render.yaml`.
+3. Provide `MONGODB_URI`, `BOOTSTRAP_ADMIN_EMAIL`, and `BOOTSTRAP_ADMIN_PASSWORD`.
+4. Confirm both `hrms-api` and `hrms-ml` services are created and healthy.
+5. The API uses `ML_SERVICE_URL=http://hrms-ml:10000` for Render private networking when both services share a region. Otherwise set the ML service's HTTPS URL.
+6. Test `/api/health` on the API and `/health` on the ML service.
+
+### GitHub Pages: Flutter Web
+
+The deploy workflow stops unless the API URL is configured.
+
+1. Open repository **Settings → Secrets and variables → Actions → Variables**.
+2. Create a repository variable named `API_BASE_URL`.
+3. Set its value to the deployed Node API HTTPS URL ending in `/api`, e.g. `https://your-api.onrender.com/api`.
+4. Open **Actions → Deploy Flutter Web → Run workflow**, or push a change under `app/`.
+5. Wait for the workflow to complete successfully.
+
+GitHub Pages hosts only the Flutter Web frontend. It does not host the Node API, MongoDB, or Python ML service.
+
+## API endpoints
+
+| Endpoint | Access | Purpose |
+|---|---|---|
+| `GET /api/health` | Public | API and database health |
+| `POST /api/auth/register` | Public | Register student |
+| `POST /api/auth/login` | Public | Sign in |
+| `GET /api/auth/me` | Signed-in user | Current account |
+| `GET /api/rooms` | Signed-in user | List rooms |
+| `GET /api/students` | Staff | List students |
+| `GET /api/maintenance` | Signed-in user | Own requests or staff request list |
+| `POST /api/maintenance` | Signed-in user | Create request |
+| `GET /api/announcements` | Signed-in user | Read notices |
+| `GET /api/dashboard` | Staff | Dashboard totals |
+| `POST /api/ml/predict-maintenance` | Staff | Predict category and priority |
+| `GET /api/ml/insights` | Staff | Maintenance analytics |
+
+Routes not explicitly public require a valid bearer token. Staff-only routes verify the role on the server.
+
+## Testing
+
+Backend:
+
+```powershell
+cd backend
+npm test
+```
+
+ML service:
+
+```powershell
+cd ml-service
+python -m unittest discover -s . -p test_app.py
+python scripts/train_evaluate.py
+```
+
+Flutter Web:
+
+```powershell
+cd app
+flutter pub get
+flutter analyze
+flutter build web --release --base-href /HRMS/ --dart-define=API_BASE_URL=https://example.invalid/api
+```
+
+The example API URL is only for compilation checks. Use the real HTTPS API URL for a usable hosted build.
+
+## DWDM limitations
+
+The included 60-row CSV is **synthetic educational data**, not real hostel data. Metrics demonstrate a reproducible evaluation workflow; they do not prove real-world reliability.
+
+For the final report:
+1. Explain the dataset source and labelling rules.
+2. Keep personal identifiers out of training data.
+3. Use a held-out test set and compare against a majority-class baseline.
+4. Report class-wise precision, recall, F1, and confusion matrices.
+5. Explicitly discuss the small synthetic dataset limitation.
+6. Replace or supplement demo data only with reviewed, de-identified, permitted records.
+
+Do not present synthetic-data metrics as proof that the model is reliable for real safety or maintenance decisions.
+
+## Documentation
+- [Project documentation](docs/PROJECT_DOCUMENTATION.md)
+- [User and deployment guide](docs/USER_GUIDE.md)
+- [DWDM implementation guide](docs/DWDM_IMPLEMENTATION_GUIDE.md)
+- [ML service guide](ml-service/README.md)
+- [Evaluation report instructions](ml-service/reports/README.md)
+
+## Security notes
+- Never commit `.env` files, credentials, real student exports, or secrets.
+- Use HTTPS for deployed frontend/API communication.
+- Restrict CORS to the deployed frontend origin.
+- Protect staff-only operations with server-side role checks.
+- Treat ML predictions as suggestions and require staff review.
