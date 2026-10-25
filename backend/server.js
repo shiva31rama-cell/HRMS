@@ -532,6 +532,10 @@ async function bootstrap() {
         role: 'admin'
       });
       console.log('Initial administrator created from environment configuration.');
+    } else if (admin.role !== 'admin') {
+      admin.role = 'admin';
+      await admin.save();
+      console.log('Configured administrator account promoted from environment configuration.');
     }
   }
 
