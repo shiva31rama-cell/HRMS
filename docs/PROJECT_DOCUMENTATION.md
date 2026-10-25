@@ -212,3 +212,40 @@ Possible next steps include CSV imports/exports, audit history, room edit UI, pa
 ## 14. Conclusion
 
 HRMS demonstrates a practical full-stack solution for core hostel administration. It connects a Flutter interface to a protected backend and persistent database, supports room capacity rules, and creates a traceable maintenance workflow. Pilot and test with synthetic data before an institution relies on it for live operations.
+
+## 15. DWDM and Machine Learning extension
+
+The same HRMS product also serves the Data Warehousing and Data Mining (DWDM) subject through its Maintenance Intelligence module.
+
+### ML problem
+
+Given a maintenance ticket title and description, predict a suggested maintenance category (Plumbing, Electrical, Cleanliness, Furniture, or Other) and a priority (low, normal, high, urgent). The prediction is advisory; hostel staff retain responsibility for the final category and priority.
+
+### Algorithms and pipeline
+
+1. Text preprocessing and TF-IDF vectorisation with unigram/bigram features.
+2. Multinomial Naive Bayes classifiers for category and priority.
+3. Descriptive data mining over the existing MongoDB ticket records: frequency distributions by category, priority and status; monthly ticket counts; and average resolution duration where valid timestamps exist.
+4. Python FastAPI exposes the model endpoints. The authenticated Node/Express API calls the Python service and supplies selected maintenance fields from MongoDB. The Flutter staff dashboard displays the resulting insights.
+
+### Dataset and validity
+
+The repository currently includes a small hand-labelled starter dataset so the prototype can run without waiting for real tickets. This is suitable for demonstrating the pipeline, not for making accuracy claims. Before final DWDM submission, collect or create a larger ethically reviewed, de-identified labelled dataset, document the source and labelling rules, split into training and held-out test data, and report per-class precision/recall, a confusion matrix, and appropriate limitations. Do not use personal identifiers as model features.
+
+### Reproducibility
+
+- Python service: `ml-service/app.py`
+- Dependencies: `ml-service/requirements.txt`
+- Tests: `ml-service/test_app.py`
+- Run tests from `ml-service/`: `python -m unittest discover -s . -p test_app.py`
+- Local service: `uvicorn app:app --reload --port 8000`
+- Health: `/health`; interactive API docs: `/docs`
+- The Render Blueprint provisions a separate `hrms-ml` service and sets the API's `ML_SERVICE_URL`.
+
+### Evaluation metrics to report after dataset expansion
+
+- Dataset size, class distribution, labelling process, and train/test split.
+- Category model: accuracy plus macro precision, macro recall, macro F1, and confusion matrix.
+- Priority model: per-class precision/recall/F1, especially recall for urgent tickets.
+- Compare the trained model against a simple majority-class baseline.
+- Discuss class imbalance, small-sample bias, ambiguous text, and the need for human review.

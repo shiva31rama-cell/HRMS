@@ -49,6 +49,7 @@ class _HomeShellState extends State<HomeShell> {
       const _Nav('Rooms', Icons.meeting_room_outlined, 'rooms'),
     ];
     if (_staff) result.add(const _Nav('Students', Icons.people_outline, 'students'));
+    if (_staff) result.add(const _Nav('ML Insights', Icons.insights_outlined, 'ml-insights'));
     result.add(const _Nav('Maintenance', Icons.handyman_outlined, 'maintenance'));
     result.add(const _Nav('Notices', Icons.campaign_outlined, 'notices'));
     return result;
@@ -175,6 +176,7 @@ class _SectionViewState extends State<_SectionView> {
     switch (widget.section) {
       case 'rooms': return '/rooms';
       case 'students': return '/students';
+      case 'ml-insights': return '/ml/insights';
       case 'maintenance': return '/maintenance';
       case 'notices': return '/announcements';
       default: return widget.isStaff ? '/dashboard' : '/auth/me';
@@ -185,6 +187,7 @@ class _SectionViewState extends State<_SectionView> {
     switch (widget.section) {
       case 'rooms': return 'Room management';
       case 'students': return 'Students';
+      case 'ml-insights': return 'Data mining & ML insights';
       case 'maintenance': return 'Maintenance requests';
       case 'notices': return 'Hostel notices';
       default:
@@ -197,6 +200,7 @@ class _SectionViewState extends State<_SectionView> {
     switch (widget.section) {
       case 'rooms': return 'Review rooms, occupancy, and monthly hostel fees.';
       case 'students': return 'Review student accounts and room assignments.';
+      case 'ml-insights': return 'Explore maintenance patterns and get ML-based issue suggestions.';
       case 'maintenance': return widget.isStaff ? 'Review resident issues and update their progress.' : 'Report issues and follow their status.';
       case 'notices': return 'Official updates, reminders, and announcements.';
       default: return widget.isStaff ? 'Here is what is happening across your hostel.' : 'Your room, requests, and notices in one place.';
@@ -373,6 +377,10 @@ class _SectionViewState extends State<_SectionView> {
   }
 
   Widget _content() {
+    if (widget.section == 'ml-insights') {
+      return _MlInsightsView(api: widget.api, initialData: _obj(_data));
+    }
+
     if (widget.section == 'rooms') {
       final rooms = _list(_obj(_data)['rooms']);
       if (rooms.isEmpty) return const _Empty(icon: Icons.meeting_room_outlined, title: 'No rooms yet', subtitle: 'Add rooms to start tracking available beds.');
@@ -594,6 +602,176 @@ double _cardWidth(BuildContext context) {
   if (width >= 1000) return 215;
   if (width >= 650) return (width - 90) / 2;
   return width - 54;
+}
+
+class _MlInsightsView extends StatefulWidget {
+  const _MlInsightsView({required this.api, required this.initialData});
+  final ApiService api;
+  final Map<String, dynamic> initialData;
+
+  @override
+  State<_MlInsightsView> createState() => _MlInsightsViewState();
+}
+
+class _MlInsightsViewState extends State<_MlInsightsView> {
+  final _form = GlobalKey<FormState>();
+  final _title = TextEditingController();
+  final _description = TextEditingController();
+  Map<String, dynamic>? _prediction;
+  bool _predicting = false;
+  String? _predictionError;
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _description.dispose();
+    super.dispose();
+  }
+
+  Future<void> _predict() async {
+    if (!_form.currentState!.validate()) return;
+    setState(() { _predicting = true; _predictionError = null; _prediction = null; });
+    try {
+      final response = await widget.api.post('/ml/predict-maintenance', {
+        'title': _title.text.trim(),
+        'description': _description.text.trim(),
+      });
+      if (mounted) setState(() => _prediction = _obj(response));
+    } catch (error) {
+      if (mounted) setState(() => _predictionError = _err(error));
+    } finally {
+      if (mounted) setState(() => _predicting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final data = widget.initialData;
+    final categories = _obj(data['categoryCounts'] ?? <String, dynamic>{});
+    final priorities = _obj(data['priorityCounts'] ?? <String, dynamic>{});
+    final statuses = _obj(data['statusCounts'] ?? <String, dynamic>{});
+    final months = _list(data['monthlyCounts']);
+    final avg = data['averageResolutionHours'];
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Card(child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Icon(Icons.auto_awesome, color: Color(0xFF176B58), size: 26),
+            const SizedBox(width: 10),
+            const Expanded(child: Text('Maintenance ML assistant', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800))),
+            _Pill(text: 'Demo model', color: const Color(0xFFE5F4ED)),
+          ]),
+          const SizedBox(height: 8),
+          const Text('Enter a maintenance issue to predict its likely category and priority. The model provides a suggestion only; staff must make the final decision.', style: TextStyle(height: 1.45, color: Color(0xFF68766F))),
+          const SizedBox(height: 16),
+          Form(key: _form, child: Column(children: [
+            TextFormField(
+              controller: _title,
+              decoration: const InputDecoration(labelText: 'Issue title', border: OutlineInputBorder()),
+              validator: _required,
+              maxLength: 120,
+            ),
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: _description,
+              decoration: const InputDecoration(labelText: 'Describe the issue', alignLabelWithHint: true, border: OutlineInputBorder()),
+              maxLines: 3,
+              maxLength: 2000,
+              validator: _required,
+            ),
+            const SizedBox(height: 12),
+            Align(alignment: Alignment.centerRight, child: FilledButton.icon(
+              onPressed: _predicting ? null : _predict,
+              icon: _predicting
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.psychology_outlined),
+              label: Text(_predicting ? 'Analysing…' : 'Predict category & priority'),
+            )),
+          ])),
+          if (_predictionError != null) ...[
+            const SizedBox(height: 12),
+            Text(_predictionError!, style: const TextStyle(color: Color(0xFF9A3030))),
+          ],
+          if (_prediction != null) ...[
+            const Divider(height: 28),
+            const Text('Model suggestion', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              _Pill(text: 'Category: ' + _val(_prediction!['category']), color: const Color(0xFFE3EFFD)),
+              _Pill(text: 'Priority: ' + _val(_prediction!['priority']), color: const Color(0xFFFFF0D9)),
+              _Pill(text: 'Category score: ' + (((_prediction!['categoryConfidence'] as num?) ?? 0) * 100).round().toString() + '%', color: const Color(0xFFE5F4ED)),
+              _Pill(text: 'Priority score: ' + (((_prediction!['priorityConfidence'] as num?) ?? 0) * 100).round().toString() + '%', color: const Color(0xFFE5F4ED)),
+            ]),
+            const SizedBox(height: 8),
+            Text(_val(_prediction!['disclaimer'], 'Review all ML suggestions before taking action.'), style: const TextStyle(fontSize: 12, color: Color(0xFF68766F), height: 1.4)),
+          ],
+        ]),
+      )),
+      const SizedBox(height: 16),
+      const Text('Maintenance data mining', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 8),
+      Wrap(spacing: 12, runSpacing: 12, children: [
+        _Stat(title: 'Tickets analysed', value: _val(data['ticketCount'], '0'), icon: Icons.dataset_outlined, width: _cardWidth(context)),
+        _Stat(title: 'Resolved-time samples', value: _val(data['resolvedSamples'], '0'), icon: Icons.timer_outlined, width: _cardWidth(context)),
+        _Stat(title: 'Average resolution', value: avg == null ? 'N/A' : _val(avg) + ' h', icon: Icons.schedule_outlined, width: _cardWidth(context)),
+      ]),
+      const SizedBox(height: 16),
+      _analyticsCard('By category', categories),
+      const SizedBox(height: 12),
+      _analyticsCard('By priority', priorities),
+      const SizedBox(height: 12),
+      _analyticsCard('By status', statuses),
+      if (months.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        Card(child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Monthly request volume', style: TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 10),
+            for (final month in months)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: Row(children: [
+                  SizedBox(width: 82, child: Text(_val(month['month']))),
+                  Expanded(child: LinearProgressIndicator(
+                    minHeight: 8,
+                    value: ((int.tryParse(_val(month['count'], '0')) ?? 0) /
+                      (months.map((item) => int.tryParse(_val(item['count'], '0')) ?? 0).fold<int>(1, (a, b) => a > b ? a : b))).clamp(0, 1).toDouble(),
+                    borderRadius: BorderRadius.circular(8),
+                  )),
+                  const SizedBox(width: 10),
+                  Text(_val(month['count'], '0'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                ]),
+              ),
+          ]),
+        )),
+      ],
+      const SizedBox(height: 10),
+      Text(_val(data['dataNote'], 'Insights are calculated from saved maintenance records.'), style: const TextStyle(fontSize: 12, color: Color(0xFF68766F), height: 1.4)),
+    ]);
+  }
+
+  Widget _analyticsCard(String title, Map<String, dynamic> values) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 10),
+        if (values.isEmpty)
+          const Text('No data yet. Add maintenance records to see patterns.', style: TextStyle(color: Color(0xFF68766F)))
+        else
+          for (final entry in values.entries)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(children: [
+                Expanded(child: Text(entry.key.replaceAll('_', ' '))),
+                Text(entry.value.toString(), style: const TextStyle(fontWeight: FontWeight.w800)),
+              ]),
+            ),
+      ]),
+    ),
+  );
 }
 
 class _RoomForm extends StatefulWidget {

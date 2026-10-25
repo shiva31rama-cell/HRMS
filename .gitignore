@@ -20,3 +20,9 @@ app/android/local.properties
 # General
 .DS_Store
 *.log
+
+# Python ML service
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/

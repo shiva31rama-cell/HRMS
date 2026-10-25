@@ -10,6 +10,7 @@ A full-stack educational project built with Flutter, Node.js, Express, and Mongo
 - Maintenance requests with open, in-progress, and resolved states.
 - Hostel announcements.
 - Dashboard totals, REST API health endpoint, validation, and basic request throttling.
+- **DWDM / ML module:** TF-IDF + Multinomial Naive Bayes suggests maintenance category and priority; data mining summarises stored ticket categories, status, monthly volume, and resolution time.
 - Responsive Flutter UI suitable for desktop, tablet, and mobile-sized browsers.
 - Automated Flutter Web deployment to GitHub Pages and an example Render service blueprint.
 
@@ -17,8 +18,37 @@ A full-stack educational project built with Flutter, Node.js, Express, and Mongo
 
 - app/ — Flutter application and web entry point.
 - backend/ — Express REST API, MongoDB models, auth middleware, and tests.
+- ml-service/ — Python FastAPI service, scikit-learn models, maintenance analytics, and ML tests.
 - .github/workflows/deploy-flutter-web.yml — GitHub Pages deployment workflow.
 - render.yaml — Render backend blueprint.
+
+
+## DWDM / Machine Learning module
+
+This same hostel application is shared by both subjects. Flutter is the application-development component; the DWDM component is the **Maintenance Intelligence** module.
+
+- Text classification: TF-IDF features + Multinomial Naive Bayes predict a maintenance category and a suggested priority from the title/description.
+- Data mining: aggregate saved maintenance records into category, priority, status, monthly volume, and average resolution-time summaries.
+- Architecture: Flutter → authenticated Node/Express API → Python FastAPI/scikit-learn service; Node reads the existing MongoDB maintenance records and passes only analytics fields to the ML service.
+- Access: ML Insights and prediction endpoints are staff-only.
+- Important limitation: the starter classifier is trained on a small hand-labelled demonstration dataset. Its score is not proof of real-world accuracy and staff must review predictions. For the final DWDM evaluation, add a sufficiently sized, reviewed, de-identified dataset and report a held-out test score/confusion matrix.
+
+### Run the ML service locally
+
+From the repository root, in a separate terminal:
+
+    cd ml-service
+    python -m venv .venv
+    # Windows PowerShell: .venv\\Scripts\\Activate.ps1
+    # macOS/Linux: source .venv/bin/activate
+    pip install -r requirements.txt
+    uvicorn app:app --reload --port 8000
+
+Set `ML_SERVICE_URL=http://localhost:8000` in `backend/.env`, then restart the Node API. Open `http://localhost:8000/docs` to inspect the service endpoints. Python tests can be run with `python -m unittest discover -s . -p test_app.py` inside `ml-service`.
+
+### Deploy ML service
+
+The Render Blueprint now includes a separate `hrms-ml` Python service. Apply/redeploy `render.yaml`, wait for its `/health` endpoint to pass, and ensure the `hrms-api` service has `ML_SERVICE_URL=http://hrms-ml:10000`. If the services are in different Render regions, use the ML service's HTTPS public URL instead. The API will return a clear 503 if the ML service has not been configured or is unavailable.
 
 ## Run locally
 

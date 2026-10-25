@@ -440,6 +440,63 @@ app.get('/api/dashboard', requireAuth, staffOnly, asyncHandler(async (req, res) 
   });
 }));
 
+// ML service integration. Database access remains in the authenticated Node API.
+const mlServiceUrl = String(process.env.ML_SERVICE_URL || '').replace(/\/$/, '');
+
+async function callMlService(path, payload) {
+  if (!mlServiceUrl) {
+    const error = new Error('ML_SERVICE_URL is not configured. Deploy the hrms-ml service and set this environment variable.');
+    error.status = 503;
+    throw error;
+  }
+  let response;
+  try {
+    response = await fetch(mlServiceUrl + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10000)
+    });
+  } catch (_) {
+    const error = new Error('The ML service is unavailable. Check the hrms-ml deployment and ML_SERVICE_URL.');
+    error.status = 503;
+    throw error;
+  }
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(body.detail || body.message || 'The ML service could not process this request.');
+    error.status = response.status >= 400 && response.status < 500 ? response.status : 502;
+    throw error;
+  }
+  return body;
+}
+
+app.post('/api/ml/predict-maintenance', requireAuth, staffOnly, asyncHandler(async (req, res) => {
+  const title = typeof req.body.title === 'string' ? req.body.title.trim() : '';
+  const description = typeof req.body.description === 'string' ? req.body.description.trim() : '';
+  if (!isNonEmptyText(title, 120) || !isNonEmptyText(description, 2000)) {
+    return res.status(400).json({ message: 'Enter a title and description for the maintenance issue.' });
+  }
+  const prediction = await callMlService('/predict-maintenance', { title, description });
+  res.json(prediction);
+}));
+
+app.get('/api/ml/insights', requireAuth, staffOnly, asyncHandler(async (req, res) => {
+  const tickets = await MaintenanceRequest.find()
+    .select('category priority status createdAt resolvedAt')
+    .sort({ createdAt: -1 })
+    .limit(1000)
+    .lean();
+  const insights = await callMlService('/analytics', tickets.map((ticket) => ({
+    category: ticket.category,
+    priority: ticket.priority,
+    status: ticket.status,
+    createdAt: ticket.createdAt,
+    resolvedAt: ticket.resolvedAt
+  })));
+  res.json(insights);
+}));
+
 app.use((req, res) => {
   res.status(404).json({ message: 'API route not found.' });
 });

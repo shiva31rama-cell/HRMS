@@ -93,3 +93,20 @@ The fixed local port 3000 is included in the sample ALLOWED_ORIGINS setting. If 
 ## H. Before using real hostel records
 
 Do not treat this demo as a production service. Obtain institutional approval, review privacy requirements, lock down CORS, define backups and retention, use a dedicated admin account, and test restore/recovery. Never commit real student data, database exports, or secrets.
+
+## I. Set up the DWDM ML service
+
+The Render Blueprint includes a separate Python service named hrms-ml. When applying the Blueprint, check that both hrms-api and hrms-ml are created. The API's ML_SERVICE_URL is configured to http://hrms-ml:10000 for Render private networking when both services are in the same region.
+
+For local development, start the Python service separately:
+
+    cd ml-service
+    python -m venv .venv
+    # Windows PowerShell: .venv\\Scripts\\Activate.ps1
+    # macOS/Linux: source .venv/bin/activate
+    pip install -r requirements.txt
+    uvicorn app:app --reload --port 8000
+
+Set ML_SERVICE_URL=http://localhost:8000 in backend/.env and restart the backend. Health endpoint: http://localhost:8000/health. Interactive API documentation: http://localhost:8000/docs.
+
+In the staff account, open ML Insights to review stored-ticket summaries and try a sample issue in the maintenance classifier. The classifier uses a small demonstration dataset, so treat its predictions as suggestions only. For academic evaluation, record the dataset source, label rules, train/test split, category-wise precision/recall, confusion matrix, and limitations. Do not report accuracy on the same examples used to train the model as a test result.
