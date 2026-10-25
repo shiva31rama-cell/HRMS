@@ -1,10 +1,12 @@
 from collections import Counter
 from datetime import datetime, timezone
 import csv
+import os
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
@@ -15,6 +17,12 @@ app = FastAPI(
     description="Maintenance text classification and descriptive data mining for HostelHub.",
     version="1.0.0",
 )
+
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://shiva31rama-cell.github.io/HRMS/")
+
+@app.get("/", include_in_schema=False)
+def frontend() -> RedirectResponse:
+    return RedirectResponse(url=FRONTEND_URL)
 
 # The bundled dataset is synthetic and intended for reproducible academic demonstration.
 # Replace it with reviewed, de-identified records before making real-world accuracy claims.
