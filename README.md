@@ -198,13 +198,7 @@ The full HRMS web app is hosted at `https://shiva31rama-cell.github.io/HRMS/`. V
 
 ### GitHub Pages: Flutter Web
 
-The deploy workflow stops unless the API URL is configured.
-
-1. Open repository **Settings → Secrets and variables → Actions → Variables**.
-2. Create a repository variable named `API_BASE_URL`.
-3. Set its value to the deployed Node API HTTPS URL ending in `/api`, e.g. `https://your-api.onrender.com/api`.
-4. Open **Actions → Deploy Flutter Web → Run workflow**, or push a change under `app/`.
-5. Wait for the workflow to complete successfully.
+The workflow defaults to the current Node API at `https://hrms-api-tapv.onrender.com/api`. If that API URL changes, create or update the repository Actions variable `API_BASE_URL` under **Settings → Secrets and variables → Actions → Variables**. Then run **Actions → Deploy Flutter Web → Run workflow**, or push a change under `app/`, and wait for the workflow to complete successfully.
 
 GitHub Pages hosts only the Flutter Web frontend. It does not host the Node API, MongoDB, or Python ML service.
 
