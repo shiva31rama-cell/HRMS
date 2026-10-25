@@ -35,7 +35,7 @@ jobs:
 
       - name: Validate deployment API URL
         env:
-          API_BASE_URL: ${{ vars.API_BASE_URL }}
+          API_BASE_URL: ${{ vars.API_BASE_URL || 'https://hrms-api-tapv.onrender.com/api' }}
         run: |
           if [ -z "$API_BASE_URL" ]; then
             echo "::error::Create the repository Actions variable API_BASE_URL with your deployed Render API URL ending in /api, then re-run this workflow."
@@ -53,7 +53,7 @@ jobs:
       - name: Build web app
         working-directory: app
         env:
-          API_BASE_URL: ${{ vars.API_BASE_URL }}
+          API_BASE_URL: ${{ vars.API_BASE_URL || 'https://hrms-api-tapv.onrender.com/api' }}
         run: flutter build web --release --base-href /HRMS/ --dart-define=API_BASE_URL="$API_BASE_URL"
 
       - name: Upload Pages artifact
