@@ -192,6 +192,8 @@ The evaluation script creates `ml-service/reports/evaluation_results.json` with 
 3. Provide `MONGODB_URI`, `BOOTSTRAP_ADMIN_EMAIL`, and `BOOTSTRAP_ADMIN_PASSWORD`.
 4. Confirm both `hrms-api` and `hrms-ml` services are created and healthy.
 5. The API uses `ML_SERVICE_URL=http://hrms-ml:10000` for Render private networking when both services share a region. Otherwise set the ML service's HTTPS URL.
+
+The full HRMS web app is hosted at `https://shiva31rama-cell.github.io/HRMS/`. Visiting `https://hrms-ml.onrender.com/` redirects to that app; the ML service remains available at `/health`, `/predict-maintenance`, and `/analytics`. The redirect target is controlled by `FRONTEND_URL` on the `hrms-ml` Render service.
 6. Test `/api/health` on the API and `/health` on the ML service.
 
 ### GitHub Pages: Flutter Web
