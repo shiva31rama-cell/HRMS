@@ -73,8 +73,7 @@ def main():
     output = REPORT_DIR / "evaluation_results.json"
     output.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(json.dumps(result, indent=2))
-    print(f"
-Saved report to: {output}")
+    print(f"\nSaved report to: {output}")
 
 if __name__ == "__main__":
     main()
