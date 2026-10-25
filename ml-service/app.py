@@ -67,6 +67,18 @@ def classify(model: Pipeline, text: str) -> tuple[str, float]:
     index = int(probabilities.argmax())
     return str(model.classes_[index]), round(float(probabilities[index]), 3)
 
+@app.get("/")
+def root() -> dict[str, str]:
+    return {
+        "service": "HRMS ML Service",
+        "status": "ok",
+        "health": "/health",
+        "docs": "/docs",
+        "predict": "/predict-maintenance",
+        "analytics": "/analytics",
+    }
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "HRMS ML Service", "model": "TF-IDF + Multinomial Naive Bayes"}
