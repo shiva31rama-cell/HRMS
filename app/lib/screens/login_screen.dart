@@ -17,6 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _phone = TextEditingController();
   final _password = TextEditingController();
   bool _register = false;
+  bool _staffLogin = false;
   bool _busy = false;
   bool _hide = true;
   String? _error;
@@ -42,8 +43,13 @@ class _LoginScreenState extends State<LoginScreen> {
         body['phone'] = _phone.text.trim();
       }
       final data = Map<String, dynamic>.from(await widget.api.post(path, body) as Map);
+      final user = Map<String, dynamic>.from(data['user'] as Map);
+      if (_staffLogin && !['admin', 'warden'].contains(user['role'])) {
+        setState(() => _error = 'This account is not an admin or warden account. Use student sign-in.');
+        return;
+      }
       await widget.api.setToken(data['token'].toString());
-      if (mounted) widget.onAuthenticated(Map<String, dynamic>.from(data['user'] as Map));
+      if (mounted) widget.onAuthenticated(user);
     } catch (error) {
       if (mounted) setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
     } finally {
@@ -127,10 +133,16 @@ class _LoginScreenState extends State<LoginScreen> {
             const Text('HostelHub', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
           ]),
           const SizedBox(height: 30),
-          Text(_register ? 'Create your account' : 'Welcome back',
+          Text(
+              _register ? 'Create your account' : _staffLogin ? 'Admin / staff sign in' : 'Welcome back',
               style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
-          Text(_register ? 'Register a student account to get started.' : 'Sign in to continue to your hostel workspace.',
+          Text(
+              _register
+                  ? 'Register a student account to get started.'
+                  : _staffLogin
+                      ? 'Use your administrator or warden account.'
+                      : 'Sign in to continue to your hostel workspace.',
               style: const TextStyle(color: Color(0xFF68766F), height: 1.4)),
           const SizedBox(height: 22),
           if (_register) ...[
@@ -174,16 +186,50 @@ class _LoginScreenState extends State<LoginScreen> {
               icon: _busy
                   ? const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : Icon(_register ? Icons.person_add_alt_1 : Icons.login_rounded),
-              label: Text(_busy ? 'Please wait…' : (_register ? 'Create account' : 'Sign in')),
+              label: Text(_busy
+                  ? 'Please wait…'
+                  : _register
+                      ? 'Create account'
+                      : _staffLogin
+                          ? 'Staff sign in'
+                          : 'Sign in'),
             ),
           ),
           const SizedBox(height: 10),
           Center(
             child: TextButton(
-              onPressed: _busy ? null : () => setState(() { _register = !_register; _error = null; }),
-              child: Text(_register ? 'Already registered? Sign in' : 'New student? Create an account'),
+              onPressed: _busy ? null : () => setState(() {
+                if (_register) {
+                  _register = false;
+                  _staffLogin = false;
+                } else if (_staffLogin) {
+                  _staffLogin = false;
+                } else {
+                  _register = true;
+                }
+                _error = null;
+              }),
+              child: Text(_register
+                  ? 'Already registered? Sign in'
+                  : _staffLogin
+                      ? 'Use regular sign in'
+                      : 'New student? Create an account'),
             ),
           ),
+          if (!_register) ...[
+            const SizedBox(height: 4),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _busy ? null : () => setState(() {
+                  _staffLogin = !_staffLogin;
+                  _error = null;
+                }),
+                icon: Icon(_staffLogin ? Icons.person_outline : Icons.admin_panel_settings_outlined),
+                label: Text(_staffLogin ? 'Student sign in' : 'Admin / Staff sign in'),
+              ),
+            ),
+          ],
           const Text(
             'Staff accounts are created by the administrator. Student registration never grants staff access.',
             textAlign: TextAlign.center,
