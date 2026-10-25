@@ -23,7 +23,7 @@ services:
       - key: SEED_DEMO_DATA
         value: "true"
       - key: ML_SERVICE_URL
-        value: "http://hrms-ml:10000"
+        value: "https://hrms-ml.onrender.com"
 
   - type: web
     name: hrms-ml
