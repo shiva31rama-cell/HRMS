@@ -16,6 +16,8 @@ services:
         generateValue: true
       - key: ALLOWED_ORIGINS
         value: "https://shiva31rama-cell.github.io"
+      - key: FRONTEND_URL
+        value: "https://shiva31rama-cell.github.io/HRMS/"
       - key: BOOTSTRAP_ADMIN_EMAIL
         sync: false
       - key: BOOTSTRAP_ADMIN_PASSWORD
