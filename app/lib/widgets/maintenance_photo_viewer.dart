@@ -89,3 +89,4 @@ class _MaintenancePhotoViewerState extends State<MaintenancePhotoViewer> {
           );
         },
       );
+}
