@@ -250,7 +250,7 @@ class _SectionViewState extends State<_SectionView> {
       result = await showDialog<Map<String, dynamic>>(context: context, builder: (_) => const _StudentForm());
       path = '/students';
     } else if (widget.section == 'maintenance') {
-      result = await showDialog<Map<String, dynamic>>(context: context, builder: (_) => const _RequestForm());
+      result = await showDialog<Map<String, dynamic>>(context: context, builder: (_) => _RequestForm(api: widget.api));
       path = '/maintenance';
     } else if (widget.section == 'notices') {
       result = await showDialog<Map<String, dynamic>>(context: context, builder: (_) => const _NoticeForm());
@@ -270,6 +270,21 @@ class _SectionViewState extends State<_SectionView> {
               : 'Saved successfully.',
         );
       }
+    } catch (error) {
+      if (mounted) _toast(context, _err(error), bad: true);
+    }
+  }
+
+  Future<void> _editMaintenance(Map<String, dynamic> request) async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => _RequestForm(api: widget.api, request: request),
+    );
+    if (result == null) return;
+    try {
+      await widget.api.patch('/maintenance/' + request['_id'].toString(), result);
+      await _load();
+      if (mounted) _toast(context, 'Maintenance request updated.');
     } catch (error) {
       if (mounted) _toast(context, _err(error), bad: true);
     }
@@ -491,6 +506,15 @@ class _SectionViewState extends State<_SectionView> {
                   _Pill(text: 'Priority: ' + _val(request['priority'], 'normal'), color: const Color(0xFFFFF0D9)),
                   _Pill(text: _when(request['createdAt']), color: const Color(0xFFE5F4ED)),
                 ]),
+                if (widget.isStaff || request['status'] == 'open')
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () => _editMaintenance(request),
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Edit request'),
+                    ),
+                  ),
                 if (widget.isStaff)
                   Align(
                     alignment: Alignment.centerRight,
@@ -919,7 +943,10 @@ class _RoomFormState extends State<_RoomForm> {
 }
 
 class _RequestForm extends StatefulWidget {
-  const _RequestForm();
+  const _RequestForm({required this.api, this.request});
+  final ApiService api;
+  final Map<String, dynamic>? request;
+
   @override
   State<_RequestForm> createState() => _RequestFormState();
 }
@@ -931,21 +958,46 @@ class _RequestFormState extends State<_RequestForm> {
   String _category = 'Other';
   String _priority = 'normal';
   MaintenancePhoto? _photo;
+  bool get _editing => widget.request != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final request = widget.request;
+    if (request != null) {
+      _title.text = _val(request['title'], '');
+      _description.text = _val(request['description'], '');
+      if (['Plumbing', 'Electrical', 'Cleanliness', 'Furniture', 'Other'].contains(request['category'])) {
+        _category = request['category'] as String;
+      }
+      if (['low', 'normal', 'high', 'urgent'].contains(request['priority'])) {
+        _priority = request['priority'] as String;
+      }
+    }
+  }
 
   @override
   void dispose() { _title.dispose(); _description.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('New maintenance request'),
+    title: Text(_editing ? 'Edit maintenance request' : 'New maintenance request'),
     content: SizedBox(width: 410, child: Form(
       key: _form,
       child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
         TextFormField(controller: _title, decoration: const InputDecoration(labelText: 'Short title'), validator: _required),
         const SizedBox(height: 10),
         TextFormField(controller: _description, minLines: 3, maxLines: 5, decoration: const InputDecoration(labelText: 'Describe the issue'), validator: _required),
+        if (_editing && widget.request?['imageFileId'] != null) ...[
+          const SizedBox(height: 10),
+          MaintenancePhotoViewer(
+            api: widget.api,
+            requestId: widget.request!['_id'].toString(),
+            imageName: _val(widget.request?['imageName'], 'Attached photo'),
+          ),
+        ],
         const SizedBox(height: 10),
-        if (_photo == null)
+        if (!_editing && _photo == null)
           Align(
             alignment: Alignment.centerLeft,
             child: OutlinedButton.icon(
@@ -957,7 +1009,7 @@ class _RequestFormState extends State<_RequestForm> {
               label: const Text('Add a photo (optional)'),
             ),
           )
-        else
+        else if (!_editing && _photo != null)
           Card(
             child: Padding(
               padding: const EdgeInsets.all(10),
@@ -1010,11 +1062,11 @@ class _RequestFormState extends State<_RequestForm> {
         Navigator.pop(context, <String, dynamic>{
           'title': _title.text.trim(), 'description': _description.text.trim(),
           'category': _category, 'priority': _priority,
-          'imageBase64': _photo == null ? null : base64Encode(_photo!.bytes),
-          'imageMimeType': _photo?.mimeType,
-          'imageName': _photo?.name,
+          if (!_editing && _photo != null) 'imageBase64': base64Encode(_photo!.bytes),
+          if (!_editing && _photo != null) 'imageMimeType': _photo!.mimeType,
+          if (!_editing && _photo != null) 'imageName': _photo!.name,
         });
-      }, child: const Text('Submit')),
+      }, child: Text(_editing ? 'Save changes' : 'Submit')),
     ],
   );
 }

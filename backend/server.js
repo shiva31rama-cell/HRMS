@@ -443,16 +443,49 @@ app.post('/api/maintenance', requireAuth, express.json({ limit: '12mb' }), async
   res.status(201).json({ request: populated });
 }));
 
-app.patch('/api/maintenance/:id', requireAuth, staffOnly, asyncHandler(async (req, res) => {
+app.patch('/api/maintenance/:id', requireAuth, asyncHandler(async (req, res) => {
   if (!validId(req.params.id)) return res.status(400).json({ message: 'Invalid request ID.' });
-  const status = req.body.status;
-  if (!['open', 'in_progress', 'resolved'].includes(status)) {
-    return res.status(400).json({ message: 'Select open, in progress, or resolved.' });
-  }
   const request = await MaintenanceRequest.findById(req.params.id);
   if (!request) return res.status(404).json({ message: 'Maintenance request not found.' });
-  request.status = status;
-  request.resolvedAt = status === 'resolved' ? new Date() : null;
+
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const staff = ['admin', 'warden'].includes(req.user.role);
+  const owner = String(request.createdBy) === String(req.user._id);
+  if (!staff && !owner) return res.status(403).json({ message: 'You cannot edit this maintenance request.' });
+
+  const hasStatus = Object.prototype.hasOwnProperty.call(body, 'status');
+  const detailFields = ['title', 'description', 'category', 'priority'];
+  const hasDetails = detailFields.some((field) => Object.prototype.hasOwnProperty.call(body, field));
+  if (!hasStatus && !hasDetails) return res.status(400).json({ message: 'No changes were provided.' });
+
+  if (hasStatus) {
+    if (!staff) return res.status(403).json({ message: 'Only hostel staff can change request status.' });
+    if (!['open', 'in_progress', 'resolved'].includes(body.status)) {
+      return res.status(400).json({ message: 'Select open, in progress, or resolved.' });
+    }
+    request.status = body.status;
+    request.resolvedAt = body.status === 'resolved' ? new Date() : null;
+  }
+
+  if (hasDetails) {
+    if (!staff && request.status !== 'open') {
+      return res.status(409).json({ message: 'You can edit a request only before staff start work on it.' });
+    }
+    const title = typeof body.title === 'string' ? body.title.trim() : request.title;
+    const description = typeof body.description === 'string' ? body.description.trim() : request.description;
+    const category = body.category === undefined ? request.category : body.category;
+    const priority = body.priority === undefined ? request.priority : body.priority;
+    if (!isNonEmptyText(title, 120) || !isNonEmptyText(description, 2000) ||
+        !['Plumbing', 'Electrical', 'Cleanliness', 'Furniture', 'Other'].includes(category) ||
+        !['low', 'normal', 'high', 'urgent'].includes(priority)) {
+      return res.status(400).json({ message: 'Check the title, description, category, and priority.' });
+    }
+    request.title = title;
+    request.description = description;
+    request.category = category;
+    request.priority = priority;
+  }
+
   await request.save();
   const populated = await MaintenanceRequest.findById(request._id)
     .populate('createdBy', 'name email').populate('room');
