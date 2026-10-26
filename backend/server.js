@@ -163,8 +163,10 @@ function toSafeMessage(error) {
   return error && error.message ? error.message : 'Unexpected server error.';
 }
 
+const frontendUrl = String(process.env.FRONTEND_URL || 'https://shiva31rama-cell.github.io/HRMS/').trim();
+
 app.get('/', (req, res) => {
-  res.json({ name: 'Hostel Room Management System API', health: '/api/health' });
+  res.redirect(302, frontendUrl);
 });
 
 app.get('/api/health', (req, res) => {
