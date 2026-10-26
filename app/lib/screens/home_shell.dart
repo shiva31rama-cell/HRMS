@@ -360,7 +360,7 @@ class _SectionViewState extends State<_SectionView> {
           const SizedBox(height: 20),
           if (_loading)
             const Padding(padding: EdgeInsets.all(42), child: Center(child: CircularProgressIndicator()))
-          else if (_error != null)
+          else if (_error != null && widget.section != 'ml-insights')
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(color: const Color(0xFFFFEEEE), borderRadius: BorderRadius.circular(12)),
@@ -378,7 +378,11 @@ class _SectionViewState extends State<_SectionView> {
 
   Widget _content() {
     if (widget.section == 'ml-insights') {
-      return _MlInsightsView(api: widget.api, initialData: _obj(_data));
+      return _MlInsightsView(
+        api: widget.api,
+        initialData: _data is Map ? _obj(_data) : <String, dynamic>{},
+        initialError: _error,
+      );
     }
 
     if (widget.section == 'rooms') {
@@ -605,9 +609,10 @@ double _cardWidth(BuildContext context) {
 }
 
 class _MlInsightsView extends StatefulWidget {
-  const _MlInsightsView({required this.api, required this.initialData});
+  const _MlInsightsView({required this.api, required this.initialData, this.initialError});
   final ApiService api;
   final Map<String, dynamic> initialData;
+  final String? initialError;
 
   @override
   State<_MlInsightsView> createState() => _MlInsightsViewState();
@@ -653,6 +658,21 @@ class _MlInsightsViewState extends State<_MlInsightsView> {
     final months = _list(data['monthlyCounts']);
     final avg = data['averageResolutionHours'];
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (widget.initialError != null)
+        Card(
+          color: const Color(0xFFFFF0D9),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Icon(Icons.info_outline, color: Color(0xFF8A5A12)),
+              const SizedBox(width: 10),
+              Expanded(child: Text(
+                'Saved-ticket analytics could not load: ${widget.initialError} The prediction form remains available; use Refresh to try again.',
+                style: const TextStyle(color: Color(0xFF67430F), height: 1.4),
+              )),
+            ]),
+          ),
+        ),
       Card(child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -708,6 +728,32 @@ class _MlInsightsViewState extends State<_MlInsightsView> {
           ],
         ]),
       )),
+      const SizedBox(height: 12),
+      Card(
+        child: ExpansionTile(
+          leading: const Icon(Icons.school_outlined, color: Color(0xFF176B58)),
+          title: const Text('How the ML model works', style: TextStyle(fontWeight: FontWeight.w800)),
+          subtitle: const Text('DWDM method, data, evaluation and limits'),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+          children: [
+            _methodStep('1', 'Training data', 'The prediction model is trained at service startup on 60 synthetic, labelled maintenance examples: five issue categories and four priority levels.'),
+            _methodStep('2', 'Text preparation', 'The title and description are combined. TF-IDF converts lowercased words and word pairs into weighted numeric features.'),
+            _methodStep('3', 'Classification', 'Two separate Multinomial Naive Bayes classifiers suggest a category and a priority.'),
+            _methodStep('4', 'Data mining', 'Separately, the dashboard summarizes up to 1,000 recent saved requests by category, priority, status and month, plus average resolution time.'),
+            _methodStep('5', 'Evaluation', 'The report script uses a stratified 80/20 hold-out split and reports class-wise precision, recall, F1, confusion matrices and a majority-class baseline.'),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: const Color(0xFFFFF0D9), borderRadius: BorderRadius.circular(10)),
+              child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Icon(Icons.warning_amber_rounded, color: Color(0xFF8A5A12), size: 20),
+                SizedBox(width: 9),
+                Expanded(child: Text('This is an academic demonstration, not a production-validated model. Displayed scores are not measured accuracy or calibrated certainty. Staff must review every suggestion, especially urgent safety issues.', style: TextStyle(color: Color(0xFF67430F), height: 1.4))),
+              ]),
+            ),
+          ],
+        ),
+      ),
       const SizedBox(height: 16),
       const Text('Maintenance data mining', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
       const SizedBox(height: 8),
@@ -751,6 +797,24 @@ class _MlInsightsViewState extends State<_MlInsightsView> {
       Text(_val(data['dataNote'], 'Insights are calculated from saved maintenance records.'), style: const TextStyle(fontSize: 12, color: Color(0xFF68766F), height: 1.4)),
     ]);
   }
+
+  Widget _methodStep(String number, String title, String detail) => Padding(
+    padding: const EdgeInsets.only(top: 12),
+    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      CircleAvatar(
+        radius: 13,
+        backgroundColor: const Color(0xFFE5F4ED),
+        foregroundColor: const Color(0xFF176B58),
+        child: Text(number, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+      ),
+      const SizedBox(width: 11),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 3),
+        Text(detail, style: const TextStyle(color: Color(0xFF68766F), height: 1.4)),
+      ])),
+    ]),
+  );
 
   Widget _analyticsCard(String title, Map<String, dynamic> values) => Card(
     child: Padding(
