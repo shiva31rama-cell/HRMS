@@ -39,7 +39,11 @@ app.use(cors({
     return callback(new Error('Origin is not allowed by CORS.'));
   }
 }));
-app.use(express.json({ limit: '1mb' }));
+const standardJsonParser = express.json({ limit: '1mb' });
+app.use((req, res, next) => {
+  if (req.method === 'POST' && req.path === '/api/maintenance') return next();
+  return standardJsonParser(req, res, next);
+});
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -98,7 +102,10 @@ const maintenanceSchema = new mongoose.Schema({
   status: { type: String, enum: ['open', 'in_progress', 'resolved'], default: 'open' },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   room: { type: mongoose.Schema.Types.ObjectId, ref: 'Room', default: null },
-  resolvedAt: { type: Date, default: null }
+  resolvedAt: { type: Date, default: null },
+  imageFileId: { type: mongoose.Schema.Types.ObjectId, default: null },
+  imageMimeType: { type: String, enum: ['image/jpeg', 'image/png', 'image/webp', null], default: null },
+  imageName: { type: String, trim: true, maxlength: 120, default: null }
 }, { timestamps: true });
 
 const MaintenanceRequest = mongoose.model('MaintenanceRequest', maintenanceSchema);
@@ -153,6 +160,20 @@ function staffOnly(req, res, next) {
 
 function validId(id) {
   return mongoose.isValidObjectId(id);
+}
+
+const MAX_MAINTENANCE_IMAGE_BYTES = 8 * 1024 * 1024;
+
+function maintenanceImageBucket() {
+  if (!mongoose.connection.db) throw new Error('Database is not available for maintenance photo storage.');
+  return new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'maintenanceImages' });
+}
+
+function detectMaintenanceImageMime(bytes) {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (bytes.length >= 12 && bytes.subarray(0, 4).toString('ascii') === 'RIFF' && bytes.subarray(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
+  return null;
 }
 
 function toSafeMessage(error) {
@@ -331,29 +352,92 @@ app.get('/api/maintenance', requireAuth, asyncHandler(async (req, res) => {
   res.json({ requests });
 }));
 
-app.post('/api/maintenance', requireAuth, asyncHandler(async (req, res) => {
-  const title = typeof req.body.title === 'string' ? req.body.title.trim() : '';
-  const description = typeof req.body.description === 'string' ? req.body.description.trim() : '';
-  const category = req.body.category || 'Other';
-  const priority = req.body.priority || 'normal';
+app.get('/api/maintenance/:id/image', requireAuth, asyncHandler(async (req, res, next) => {
+  if (!validId(req.params.id)) return res.status(400).json({ message: 'Invalid request ID.' });
+  const request = await MaintenanceRequest.findById(req.params.id).select('createdBy imageFileId imageMimeType imageName');
+  if (!request) return res.status(404).json({ message: 'Maintenance request not found.' });
+  const staff = ['admin', 'warden'].includes(req.user.role);
+  if (!staff && String(request.createdBy) !== String(req.user._id)) {
+    return res.status(403).json({ message: 'You cannot view this maintenance photo.' });
+  }
+  if (!request.imageFileId || !['image/jpeg', 'image/png', 'image/webp'].includes(request.imageMimeType)) {
+    return res.status(404).json({ message: 'No photo is attached to this request.' });
+  }
+  res.set('Content-Type', request.imageMimeType);
+  res.set('Content-Disposition', 'inline; filename="' + String(request.imageName || 'maintenance-photo').replace(/[^a-zA-Z0-9._-]/g, '_') + '"');
+  res.set('Cache-Control', 'private, no-store');
+  maintenanceImageBucket().openDownloadStream(request.imageFileId)
+    .on('error', next)
+    .pipe(res);
+}));
+
+app.post('/api/maintenance', requireAuth, express.json({ limit: '12mb' }), asyncHandler(async (req, res) => {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const title = typeof body.title === 'string' ? body.title.trim() : '';
+  const description = typeof body.description === 'string' ? body.description.trim() : '';
+  const category = body.category || 'Other';
+  const priority = body.priority || 'normal';
   if (!isNonEmptyText(title, 120) || !isNonEmptyText(description, 2000) ||
       !['Plumbing', 'Electrical', 'Cleanliness', 'Furniture', 'Other'].includes(category) ||
       !['low', 'normal', 'high', 'urgent'].includes(priority)) {
     return res.status(400).json({ message: 'Check the title, description, category, and priority.' });
   }
+  let photo = null;
+  let imageFileId = null;
+  const encodedImage = body.imageBase64;
+  if (encodedImage !== undefined && encodedImage !== null && encodedImage !== '') {
+    const maximumEncodedLength = Math.ceil(MAX_MAINTENANCE_IMAGE_BYTES / 3) * 4;
+    if (typeof encodedImage !== 'string' || encodedImage.length > maximumEncodedLength || encodedImage.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(encodedImage)) {
+      return res.status(400).json({ message: 'The attached photo is invalid or larger than 8 MB.' });
+    }
+    const bytes = Buffer.from(encodedImage, 'base64');
+    if (bytes.length === 0 || bytes.length > MAX_MAINTENANCE_IMAGE_BYTES) {
+      return res.status(400).json({ message: 'The attached photo must be smaller than 8 MB.' });
+    }
+    const detectedMimeType = detectMaintenanceImageMime(bytes);
+    if (!detectedMimeType || body.imageMimeType !== detectedMimeType) {
+      return res.status(400).json({ message: 'Attach a valid JPG, PNG, or WebP photo.' });
+    }
+    const imageName = String(body.imageName || 'maintenance-photo')
+      .trim().slice(0, 120).replace(/[^a-zA-Z0-9._-]/g, '_') || 'maintenance-photo';
+    photo = { bytes, mimeType: detectedMimeType, name: imageName };
+  }
+
   let roomId = req.user.room && req.user.room._id ? req.user.room._id : req.user.room;
-  if (['admin', 'warden'].includes(req.user.role) && req.body.roomId) {
-    if (!validId(req.body.roomId)) return res.status(400).json({ message: 'Invalid room ID.' });
-    const selectedRoom = await Room.findById(req.body.roomId);
+  if (['admin', 'warden'].includes(req.user.role) && body.roomId) {
+    if (!validId(body.roomId)) return res.status(400).json({ message: 'Invalid room ID.' });
+    const selectedRoom = await Room.findById(body.roomId);
     if (!selectedRoom) return res.status(404).json({ message: 'Room not found.' });
     roomId = selectedRoom._id;
   }
 
-  const request = await MaintenanceRequest.create({
-    title, description, category, priority,
-    createdBy: req.user._id,
-    room: roomId || null
-  });
+  if (photo) {
+    imageFileId = new mongoose.Types.ObjectId();
+    await new Promise((resolve, reject) => {
+      const upload = maintenanceImageBucket().openUploadStream(photo.name, {
+        id: imageFileId,
+        metadata: { contentType: photo.mimeType, ownerId: String(req.user._id) }
+      });
+      upload.once('error', reject);
+      upload.once('finish', resolve);
+      upload.end(photo.bytes);
+    });
+  }
+
+  let request;
+  try {
+    request = await MaintenanceRequest.create({
+      title, description, category, priority,
+      createdBy: req.user._id,
+      room: roomId || null,
+      imageFileId,
+      imageMimeType: photo ? photo.mimeType : null,
+      imageName: photo ? photo.name : null
+    });
+  } catch (error) {
+    if (imageFileId) await maintenanceImageBucket().delete(imageFileId).catch(() => {});
+    throw error;
+  }
   const populated = await MaintenanceRequest.findById(request._id)
     .populate('createdBy', 'name email').populate('room');
   res.status(201).json({ request: populated });

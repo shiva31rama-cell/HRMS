@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../widgets/maintenance_photo_capture.dart';
+import '../widgets/maintenance_photo_viewer.dart';
 
 Map<String, dynamic> _obj(dynamic value) => Map<String, dynamic>.from(value as Map);
 List<Map<String, dynamic>> _list(dynamic value) => value is List
@@ -474,6 +477,14 @@ class _SectionViewState extends State<_SectionView> {
                 ]),
                 const SizedBox(height: 8),
                 Text(_val(request['description'], ''), style: const TextStyle(height: 1.4)),
+                if (request['imageFileId'] != null) ...[
+                  const SizedBox(height: 12),
+                  MaintenancePhotoViewer(
+                    api: widget.api,
+                    requestId: request['_id'].toString(),
+                    imageName: _val(request['imageName'], 'Maintenance photo'),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 Wrap(spacing: 8, runSpacing: 8, children: [
                   _Pill(text: _val(request['category']), color: const Color(0xFFE3EFFD)),
@@ -919,6 +930,7 @@ class _RequestFormState extends State<_RequestForm> {
   final _description = TextEditingController();
   String _category = 'Other';
   String _priority = 'normal';
+  MaintenancePhoto? _photo;
 
   @override
   void dispose() { _title.dispose(); _description.dispose(); super.dispose(); }
@@ -932,6 +944,38 @@ class _RequestFormState extends State<_RequestForm> {
         TextFormField(controller: _title, decoration: const InputDecoration(labelText: 'Short title'), validator: _required),
         const SizedBox(height: 10),
         TextFormField(controller: _description, minLines: 3, maxLines: 5, decoration: const InputDecoration(labelText: 'Describe the issue'), validator: _required),
+        const SizedBox(height: 10),
+        if (_photo == null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                final photo = await showMaintenancePhotoCapture(context);
+                if (photo != null && mounted) setState(() => _photo = photo);
+              },
+              icon: const Icon(Icons.add_a_photo_outlined),
+              label: const Text('Add a photo (optional)'),
+            ),
+          )
+        else
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Row(children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.memory(_photo!.bytes, width: 84, height: 72, fit: BoxFit.cover),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(child: Text('Photo attached to this request', style: TextStyle(fontWeight: FontWeight.w600))),
+                IconButton(
+                  tooltip: 'Remove photo',
+                  onPressed: () => setState(() => _photo = null),
+                  icon: const Icon(Icons.close),
+                ),
+              ]),
+            ),
+          ),
         const SizedBox(height: 10),
         DropdownButtonFormField<String>(
           value: _category,
@@ -966,6 +1010,9 @@ class _RequestFormState extends State<_RequestForm> {
         Navigator.pop(context, <String, dynamic>{
           'title': _title.text.trim(), 'description': _description.text.trim(),
           'category': _category, 'priority': _priority,
+          'imageBase64': _photo == null ? null : base64Encode(_photo!.bytes),
+          'imageMimeType': _photo?.mimeType,
+          'imageName': _photo?.name,
         });
       }, child: const Text('Submit')),
     ],

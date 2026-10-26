@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -44,6 +45,27 @@ class ApiService {
   Future<dynamic> post(String path, [Map<String, dynamic>? body]) => _request('POST', path, body);
   Future<dynamic> patch(String path, [Map<String, dynamic>? body]) => _request('PATCH', path, body);
   Future<dynamic> delete(String path) => _request('DELETE', path);
+
+  Future<Uint8List> getBytes(String path) async {
+    final uri = Uri.parse(baseUrl + path);
+    final headers = <String, String>{'Accept': 'image/*'};
+    if (hasToken) headers['Authorization'] = 'Bearer ' + _token!;
+    final response = await http.get(uri, headers: headers);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (response.statusCode == 401) await clearToken();
+      dynamic decoded;
+      try {
+        decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      } catch (_) {
+        decoded = null;
+      }
+      final message = decoded is Map ? decoded['message']?.toString() : null;
+      throw Exception(message == null || message.isEmpty
+          ? 'Image could not be loaded (' + response.statusCode.toString() + ').'
+          : message);
+    }
+    return response.bodyBytes;
+  }
 
   Future<dynamic> _request(String method, String path, [Map<String, dynamic>? body]) async {
     final uri = Uri.parse(baseUrl + path);
